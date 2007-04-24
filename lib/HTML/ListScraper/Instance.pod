@@ -1,0 +1,18 @@
+=head1 NAME
+
+HTML::ListScraper::Instance - sequence instance found by L<HTML::ListScraper>
+
+=head1 METHODS
+
+All documented methods are simple accessors, taking no arguments and
+leaving the C<HTML::ListScraper::Instance> object unchanged.
+
+=head2 start
+
+Sequence start position.
+
+=head2 tags
+
+An array of L<HTML::ListScraper::Tag> objects.
+
+=cut
