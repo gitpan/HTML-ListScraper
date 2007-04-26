@@ -1,0 +1,297 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use HTML::ListScraper;
+use HTML::ListScraper::Interactive qw(format_tags canonicalize_tags);
+use Fatal qw(open close);
+use vars qw(*EXPORT *IMPORT);
+
+sub show_core;
+
+my $whole;
+my $shapeless;
+my $min_count = 1;
+my @core_values = qw(item list all);
+my $core;
+my @detail_values = qw(none tags text attributes all);
+my $detail = 'tags';
+my $export;
+my $import;
+my $ignore;
+GetOptions('whole' => \$whole,
+	   'shapeless' => \$shapeless,
+	   'min-count=i' => \$min_count,
+	   'core=s' => \$core,
+	   'detail=s' => \$detail,
+	   'export=s' => \$export,
+	   'import=s' => \$import,
+	   'ignore=s' => \$ignore
+	  );
+
+my $argc = scalar(@ARGV);
+if (($argc < 1) || ($argc > 2)) {
+    die "usage: $0 [ options ] filename\n";
+}
+
+my $scraper = HTML::ListScraper->new( api_version => 3,
+				      marked_sections => 1 );
+
+my @ignore;
+if (!$ignore) {
+    @ignore = qw(b i em strong);
+} else {
+    @ignore = map { lc $_; } split /\s*,\s*/, $ignore;
+}
+
+if (@ignore) {
+    $scraper->ignore_tags(@ignore);
+}
+
+if ($shapeless) {
+    $scraper->shapeless(1);
+}
+
+if ($min_count > 1) {
+    $scraper->min_count($min_count);
+}
+
+$scraper->parse_file($ARGV[0]);
+
+if ($whole) {
+    my $tags = $scraper->get_all_tags();
+    print "---|\n", format_tags($scraper, $tags, { ln => 1 });
+}
+
+if ($import && !$core) {
+    $core = 'l';
+}
+
+if ($core) {
+    my %core_values;
+    foreach my $lv (@core_values) {
+        my $sv = substr($lv, 0, 1);
+	$core_values{$sv} = 1;
+        if ($core eq $lv) {
+	    $core = $sv;
+	}
+    }
+
+    if (!exists($core_values{$core})) {
+        my $cv = join ', ', @core_values;
+	die "invalid --core value; use one of [ $cv ]\n";
+    }
+
+    show_core();
+}
+
+if ($export) {
+    my @seq = $scraper->get_sequences;
+    my $seq = shift @seq;
+    if ($seq) {
+        open(EXPORT, ">$export");
+	my @inst = $seq->instances;
+	my $inst = shift @inst;
+	my @tags = format_tags($scraper, [ $inst->tags ]);
+	print EXPORT @tags;
+	close(EXPORT);
+    }
+}
+
+sub show_core {
+    my %detail_values;
+    foreach my $lv (@detail_values) {
+	$detail_values{$lv} = 1;
+    }
+
+    if (!exists($detail_values{$detail})) {
+        my $dv = join ', ', @detail_values;
+	die "invalid --detail value; use one of [ $dv ]\n";
+    }
+
+    my @sequences;
+    if (!$import) {
+        @sequences = $scraper->get_sequences;
+    } else {
+        open(IMPORT, $import);
+	my @import = <IMPORT>;
+	my @tags = canonicalize_tags(@import);
+        my $s = $scraper->get_known_sequence(@tags);
+	if ($s) {
+	    push @sequences, $s;
+	}
+    }
+
+    foreach my $seq (@sequences) {
+        print "---\n";
+	print "len: ", $seq->len, "\n";
+	print "count: ", scalar($seq->instances), "\n";
+	foreach my $inst ($seq->instances) {
+ 	    print "- start: ", $inst->start, "\n";
+
+	    if ($detail ne 'none') {
+	        my $incl_text = ($detail eq 'text') || ($detail eq 'all');
+		my $incl_attr = ($detail eq 'attributes') ||
+		    ($detail eq 'all');
+		my @scalar = map {
+		    '   ' . $_;
+		} format_tags($scraper, [ $inst->tags ],
+			      { text => $incl_text, attr => $incl_attr });
+		print "  match: |\n", @scalar;
+
+		if ($core eq 'i') {
+		    return;
+		}
+	    }
+	}
+
+	if ($core eq 'l') {
+	    return;
+	}
+    }
+}
+
+__END__
+
+=head1 NAME
+
+scrape - command-line frontend to L<HTML::ListScraper>
+
+=head1 SYNOPSIS
+
+ scrape --core=all sample.html
+
+ scrape --core=list [ --min-count=10 ] [ --detail=all ] [ --shapeless ]
+	[ --ignore=b,i,em,strong,wbr ] [ --export=seq.txt ] sample.html
+
+ scrape --core=item --import=seq.txt sample.html
+
+ scrape --whole sample.html
+
+=head1 DESCRIPTION
+
+This script processes a HTML page with C<HTML::ListScraper> and shows
+the result, as L<YAML> (down to the tag sequences, which are YAML
+scalars formatted by L<HTML::ListScraper::Interactive>). It's meant
+for interactive exploration of L<HTML::ListScraper> results and
+fine-tuning of its settings for a specific scraping application.
+
+For every invocation, the single source file is mandatory. All other
+command-line switches are optional and mutually independent. Note that
+with no switches, the script doesn't output anything. The switches are
+as follows:
+
+==head2 --core
+
+Show found repeats. Value is a string, one of
+
+=over
+
+=item item (or just "i")
+
+Show only the first sequence instance.
+
+=item list (or just "l")
+
+Show all instances of the first sequence.
+
+=item all (or just "a")
+
+Show all instances of all found sequences.
+
+=back
+
+By default, no matches are shown. When they are shown, a YAML
+document, corresponding to a L<HTML::ListScraper::Sequence>, has the
+sequence length as YAML field C<len>, the repeat count as C<count> and
+then a YAML sequence with items corresponding to
+L<HTML::ListScraper::Instance>. Each item has a C<start> field with
+the starting position and C<match> field with the actual tag sequence.
+The tag sequence is formatted by
+L<HTML::ListScraper::Interactive::format_tags>, with formatting
+options depending on the value of the C<--detail> command line switch.
+
+==head2 --shapeless
+
+Boolean switch, sets L<HTML::ListScraper::shapeless> to true.
+
+==head2 --min-count
+
+Value is an integer bigger than 1, used to set
+L<HTML::ListScraper::min_count>.
+
+==head2 --detail
+
+Specifies formatting of found tag sequences. Value is a string, one of
+
+=over
+
+=item none
+
+Don't show the matches at all. This is useful to see just how many
+sequences were found and how many instances they have.
+
+=item tags
+
+Show just the tags, without text and links. This is the default value.
+
+=item text
+
+Show tags and text.
+
+=item attributes
+
+Show tags with links.
+
+=item all
+
+Show all fields of L<HTML:ListScraper::Tag>: tags, text and links.
+
+=back
+
+==head2 --whole
+
+Boolean switch. When used, C<scrape> outputs, as the first YAML
+document containing a single YAML scalar, the whole sequence
+maintained by C<HTML::ListScraper>. Note that the sequence is
+formatted without attributes, without text and with line numbers,
+irrespective of the value of C<--detail>.
+
+==head2 --ignore
+
+A comma-separated list of tags the HTML parser should ignore. The list
+items shouldn't contain any slashes nor angle brackets. For every name
+in the list, both opening and closing tag are ignored. Default is C<b,
+i, em, strong>; when specifying the value explicitly, you probably
+want to include these tags in it.
+
+==head2 --export
+
+Instructs C<scrape> to dump the first found sequence into the file
+specified by the option's value. If the file already exists, it's
+overwritten. When no sequence is found, nothing is dumped. Note that
+the sequence is formatted with just tags, irrespective of the value of
+C<--detail>.
+
+==head2 --import
+
+Instructs C<scrape> to call C<HTML::ListScraper::get_known_sequence>
+instead of C<HTML::ListScraper::get_sequences>, with arguments read
+from the file specified by the option's value. Lines of that file are
+converted to tag names by
+C<HTML::ListScraper::Interactive::canonicalize_tags>.
+
+=head1 AUTHOR
+
+Vaclav Barta, C<< <vbar@comp.cz> >>
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2007 Vaclav Barta, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+=cut

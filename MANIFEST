@@ -3,6 +3,7 @@ MANIFEST
 META.yml
 Makefile.PL
 README
+scrape
 lib/HTML/ListScraper.pm
 lib/HTML/ListScraper/Book.pm
 lib/HTML/ListScraper/Foam.pm
@@ -17,6 +18,8 @@ t/Interactive.t
 t/reddit.t
 t/google.t
 t/scrape.t
+testdata/del.icio.us-overview.yaml
+testdata/del.icio.us.html
 testdata/reddit.html
 testdata/google.html
 testdata/synth.html
