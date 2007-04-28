@@ -3,3 +3,6 @@ Revision history for HTML-ListScraper
 0.01    Tue Apr 24 17:35:47 UTC 2007
         First version.
 
+0.03	Sat Apr 28 12:50:18 UTC 2007
+	Package fixes: added missing files, more portable tests.
+

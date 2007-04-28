@@ -2,45 +2,32 @@
 
 use warnings;
 
+use vars qw(*F);
+
 use Test::More tests => 3;
-use File::Compare;
-use Fatal qw(mkdir rmdir unlink);
+use Fatal qw(open mkdir rmdir unlink);
+use IPC::Run3 qw/run3/;
+use Probe::Perl;
 
-if (!-d "tmp") {
-    mkdir("tmp");
-}
+sub check;
 
-check('all');
-check('l');
+my $perl = Probe::Perl->find_perl_interpreter;
 
-checked_system("./scrape --min-count=12 --core=a --detail=none testdata/del.icio.us.html > tmp/del.icio.us.yaml");
-my $d = compare("testdata/del.icio.us-overview.yaml", "tmp/del.icio.us.yaml");
-if (!$d) {
-    unlink("tmp/del.icio.us.yaml");
-}
-
-ok(!$d);
-
-rmdir("tmp");
+check('scrape --core=all testdata/synth.html',
+      'testdata/synth-default.yaml');
+check('scrape --core=l testdata/synth.html',
+      'testdata/synth-default.yaml');
+check('scrape --min-count=12 --core=a --detail=none testdata/del.icio.us.html',
+      'testdata/del.icio.us-overview.yaml');
 
 sub check {
-    my $core = shift;
+    my ($cmd, $datapath) = @_;
 
-    checked_system("./scrape --core=$core testdata/synth.html > tmp/$core.yaml");
-    my $d = compare("testdata/synth-default.yaml", "tmp/$core.yaml");
-    if (!$d) {
-        unlink("tmp/$core.yaml");
-    }
+    my $stdout;
+    run3("$perl $cmd", undef, \$stdout, undef);
 
-    ok(!$d);
+    open(F, $datapath);
+    my $data = join '', <F>;
+
+    is($stdout, $data);
 }
-
-sub checked_system {
-    my $cmd = shift;
-
-    my $r = system($cmd);
-    if ($r) {
-        die "can't execute scrape";
-    }
-}
-
