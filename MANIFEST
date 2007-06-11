@@ -6,11 +6,13 @@ README
 scrape
 lib/HTML/ListScraper.pm
 lib/HTML/ListScraper/Book.pm
+lib/HTML/ListScraper/Dust.pm
 lib/HTML/ListScraper/Foam.pm
 lib/HTML/ListScraper/Instance.pod
 lib/HTML/ListScraper/Interactive.pm
 lib/HTML/ListScraper/Occurence.pm
 lib/HTML/ListScraper/Sequence.pod
+lib/HTML/ListScraper/Sweep.pm
 lib/HTML/ListScraper/Tag.pod
 lib/HTML/ListScraper/Vat.pm
 t/00-load.t

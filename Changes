@@ -9,3 +9,6 @@ Revision history for HTML-ListScraper
 0.04	Mon Jun 11 16:44:20 UTC 2007
 	Added approximate matching.
 
+0.05	Mon Jun 11 18:12:50 UTC 2007
+	Package fix: added missing files.
+
