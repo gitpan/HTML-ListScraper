@@ -88,10 +88,6 @@ sub _prune_map {
 sub _skim_map {
     my $self = shift;
 
-#     if ($self->{length} <= 6) {
-# 	return;
-#     }
-
     foreach my $seq (keys %{$self->{map}}) {
 	my $occ = $self->{map}->{$seq};
 	if ($occ->spread == $self->{max_spread}) {

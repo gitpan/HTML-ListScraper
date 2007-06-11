@@ -8,6 +8,7 @@ use Class::Generate qw(class);
 
 use HTML::ListScraper::Vat;
 use HTML::ListScraper::Book;
+use HTML::ListScraper::Sweep;
 
 use vars qw(@ISA);
 
@@ -18,12 +19,14 @@ class 'HTML::ListScraper::Sequence' => {
 
 class 'HTML::ListScraper::Instance' => {
     start => { type => '$', required => 1, readonly => 1 },
+    match => { type => '$', required => 1, readonly => 1 },
+    score => { type => '$', required => 0, readonly => 1 },
     tags => { type => '@', required => 1 }
 };
 
 @ISA = qw(HTML::Parser);
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 sub new {
     my $class = shift;
@@ -95,20 +98,28 @@ sub get_sequences {
     } @sequences;
 }
 
-sub get_known_sequence {
+sub find_sequences {
     my $self = shift;
 
-    my $len = scalar(@_);
-
-    my $needle = '';
-    foreach (@_) {
-        my $internal = $self->{book}->get_internal_name($_);
-	if (!defined($internal)) { # sequence not found if item not found
-	    return undef;
+    my @sequences;
+    my $vat = HTML::ListScraper::Vat->new($self->{book}, $self->{min_count});
+    my $foam = $vat->create_sequence;
+    if ($foam) {
+        foreach my $sign ($foam->get_sequences) {
+	    my $occ = $foam->get_occurence($sign);
+	    push @sequences, $self->_make_approx_seq($sign, $occ);
 	}
-
-	$needle .= $internal;
     }
+
+    return sort {
+        $a->len <=> $b->len;
+    } @sequences;
+}
+
+sub _get_known_occ {
+    my ($self, $needle) = @_;
+
+    my $len = length($needle);
 
     my $haystack = join '', $self->{book}->get_internal_sequence;
 
@@ -124,7 +135,139 @@ sub get_known_sequence {
         $pos = index($haystack, $needle, $pos + $len);
     }
 
+    return $occ;
+}
+
+sub get_known_sequence {
+    my $self = shift;
+
+    my $len = scalar(@_);
+    if ($len < 2) {
+        die "need at least 2 items to look for";
+    }
+
+    my $needle = '';
+    foreach (@_) {
+        my $internal = $self->{book}->get_internal_name($_);
+	if (!defined($internal)) { # sequence not found if item not found
+	    return undef;
+	}
+
+	$needle .= $internal;
+    }
+
+    my $occ = $self->_get_known_occ($needle);
     return !defined($occ) ? undef : $self->_make_sequence($occ);
+}
+
+sub find_known_sequence {
+    my $self = shift;
+
+    my $len = scalar(@_);
+
+    if ($len < 2) {
+        die "need at least 2 items to look for";
+    }
+
+    my @tags = @_;
+
+    my $sign = '';
+    foreach (@tags) {
+        my $iname = $self->{book}->intern_name($_);
+	$sign .= $iname;
+    }
+
+    my $occ = $self->_get_known_occ($sign);
+    if ($occ) {
+        return $self->_make_approx_seq($sign, $occ);
+    } else {
+	return $self->_make_whole_seq($sign);
+    }
+}
+
+sub _make_approx_seq {
+    my ($self, $sign, $occ) = @_;
+
+    my $len = $occ->len;
+    my $edge;
+    my @instances;
+    foreach my $pos ($occ->positions) {
+        my $gap;
+	if (!defined($edge)) {
+	    $gap = 0;
+	} elsif ($pos >= $edge + $len) {
+	    $gap = $edge + $len;
+	}
+
+	if (defined($gap)) {
+	    push @instances,
+	        $self->_make_approx_inst($sign, $gap, $pos);
+
+	    my @tags = $self->{book}->get_tags($pos, $len);
+	    push @instances,
+	        HTML::ListScraper::Instance->new(start => $pos,
+		    match => 'exact', tags => \@tags);
+	    $edge = $pos;
+	}
+    }
+
+    if (!defined($edge)) {
+        die "no occurence";
+    }
+
+    my $iseq = $self->{book}->get_internal_sequence;
+    my $end = scalar(@$iseq);
+    push @instances,
+        $self->_make_approx_inst($sign, $edge + $len, $end);
+
+    return HTML::ListScraper::Sequence->new(len => $len,
+        instances => \@instances);
+}
+
+sub _make_whole_seq {
+    my ($self, $sign) = @_;
+
+    my $iseq = $self->{book}->get_internal_sequence;
+    my $end = scalar(@$iseq);
+    my @instances = $self->_make_approx_inst($sign, 0, $end);
+
+    my $seq = undef;
+    if (scalar(@instances)) {
+        $seq = HTML::ListScraper::Sequence->new(len => length($sign),
+            instances => \@instances);
+    }
+
+    return $seq;
+}
+
+sub _make_approx_inst {
+    my ($self, $sign, $begin, $end) = @_;
+
+    my $size = $end - $begin;
+    if ($size < 2) {
+        return ();
+    }
+
+    my $sweep = HTML::ListScraper::Sweep->new(
+        book => $self->{book}, sign => $sign,
+        begin => $begin, end => $end);
+    my $dust = $sweep->create_dust;
+    my @instances;
+    foreach my $align ($dust->get_alignments) {
+        my @tags;
+	foreach my $pos ($align->positions) {
+	    my $t = $self->{book}->get_tag($pos);
+	    push @tags, $t;
+	}
+
+	my $start = $tags[0]->index;
+	push @instances,
+	    HTML::ListScraper::Instance->new(start => $start,
+		match => 'approx', score => $align->score,
+		tags => \@tags);
+    }
+
+    return @instances;
 }
 
 sub _make_sequence {
@@ -138,7 +281,7 @@ sub _make_sequence {
 	    my @tags = $self->{book}->get_tags($pos, $len);
 	    push @instances,
 	        HTML::ListScraper::Instance->new(start => $pos,
-		    tags => \@tags);
+		    match => 'exact', tags => \@tags);
 	    $edge = $pos;
 	}
     }
@@ -198,7 +341,7 @@ HTML::ListScraper - generic web page scraping support
 
 =head1 VERSION
 
-Version 0.01
+Version 0.04
 
 =head1 SYNOPSIS
 
@@ -211,7 +354,7 @@ Version 0.01
  $scraper->parse($html);
  $scraper->eof;
 
- @seq = $scraper->get_sequences;
+ @seq = $scraper->find_sequences;
  $seq = shift @seq;
  if ($seq) { # is-a HTML::ListScraper::Sequence
      foreach $inst ($seq->instances) { # is-a HTML::ListScraper::Instance
@@ -238,12 +381,12 @@ something just vaguely similar to it - to tags and text. HTML parsing
 works the same as with C<HTML::Parser>, except you don't need to
 register your own HTML event handlers.
 
-When the document is parsed, call C<get_sequences> to find out which
+When the document is parsed, call C<find_sequences> to find out which
 tags in the document repeat, one after the other, more than once (text
 and comments are ignored for this comparison). Since there'll probably
 be quite a lot of such sequences, C<HTML::ListScraper> tries to find
 the "longest one repeating most often", specifically, it maximizes
-C<(number of non-overlapping runs)^(number of tags in the
+C<log(number of non-overlapping runs)*log(number of tags in the
 sequence)>. There can obviously be more than one such sequence, which
 is why the method returns an array (and the array can also be empty -
 see below). Your application can then iterate over the returned
@@ -273,18 +416,18 @@ argument to set it. Default (as well as the minimal allowed value) is
 
 =head2 shapeless
 
-By default, C<get_sequences> returns only "forrest-shaped" sequences,
+By default, C<get_sequences> returns only "well-shaped" sequences,
 whose every opening tag is followed by the appropriate closing tag,
 with an exception for those tags whose closing tag is optional -
-i.e. C<< <div><br></div> >> is "forrest-shaped" but none of its 2-tag
-sub-sequences are. Tags which don't need a closing tag are those
-identified by C<is_unclosed_tag>. Closing tags are paired with the
-nearest opening tag with the same name, whether that opening tag needs
-a closing tag or not. A "forrest-shaped" sequence is basically a tree,
-but it doesn't have to have a single root.
+i.e. C<< <div><br></div> >> is well-shaped but neither C<< <div><br>
+>> nor C<< <br></div> >> is. Tags which don't need a closing tag are
+those identified by C<is_unclosed_tag>. Closing tags are paired with
+the nearest opening tag with the same name which hasn't been paired
+yet. A well-shaped sequence is basically an HTML fragment - like a
+tree, except it doesn't have to have a single root.
 
-"Forrest-shaped" sequences should be fine when processing valid HTML,
-but since this module doesn't restrict itself to valid HTML, it isn't
+Well-shaped sequences should be fine when processing valid HTML, but
+since this module doesn't restrict itself to valid HTML, that isn't
 always good enough. Setting C<shapeless> to a true value removes this
 filtering and makes all sequences eligible.
 
@@ -308,16 +451,37 @@ L<HTML::ListScraper::Tag> objects.
 
 The core of C<HTML::ListScraper>. Takes no arguments, returns an array
 of L<HTML::ListScraper::Sequence> objects. The sequences are sorted by
-length (shortest first), which comes useful when the same tags get
-assigned into more than one sequence (i.e. C<<
-<div><br></div><div><br></div><div><br></div><div><br></div> >> is
-both a sequence of 3 tags repeating 4 times and a sequence of 6 tags
-repeating twice, both sequences having the same score).
+length (shortest first).
 
 "Sequences" with just 1 tag and sequences which don't repeat are never
 returned; depending on the value of C<min_count> and C<shapeless>,
 C<get_sequences> may also ignore other ones (see C<min_count> and
 C<shapeless>).
+
+=head2 find_sequences
+
+A generalization of C<get_sequences>. Like C<get_sequences>,
+C<find_sequences> takes no arguments and returns an array of
+L<HTML::ListScraper::Sequence> objects - the same sequences, in fact,
+as C<get_sequences>, but with potentially more instances. In addition
+to the exact matches, C<find_sequences> tries to find "approximate"
+instance matches, that is, tag sequences with a non-zero but low edit
+distance from the exact sequence.
+
+The alignment uses L<Algorithm::NeedlemanWunsch> (q.v.) in its local
+mode, with fixed scores whose particular values hopefully don't matter
+much (see the source of C<HTML::ListScraper::Sweep> if you're really
+interested in them). Approximate instances are sought between the
+exact ones, from the most similar to a cut-off point of low
+similarity.
+
+Found approximate instances are identified by
+C<HTML::ListScraper::Instance::match> value C<approx>. their score is
+available as the value of C<HTML::ListScraper::Instance::score>. That
+value isn't always defined, though: if the C<shapeless> flag isn't
+set, approximate tag sequences are made to look like valid HTML
+fragments by removing unpaired tags. Since that obviously damages the
+score, no score is returned for such cut-up instances.
 
 =head2 get_known_sequence
 
@@ -331,6 +495,15 @@ i.e. in lowercase, without angle brackets and with closing tags having
 specified sequence, C<get_known_sequence> returns C<undef>. Otherwise,
 it returns an instance of L<HTML::ListScraper::Sequence>.
 
+=head2 find_known_sequence
+
+A generalization of C<get_known_sequence>. Like C<get_known_sequence>,
+C<find_known_sequence> takes a list of tag names and finds both exact
+and approximate matches for it. If the parsed document doesn't contain
+at least one at least approximately matching tag sequences,
+C<find_known_sequence> returns C<undef>. Otherwise, it returns an
+instance of L<HTML::ListScraper::Sequence>.
+
 =head2 on_start
 
 Attribute start handler. Registered with signature C<self, tagname,
@@ -338,7 +511,7 @@ attr>, although the only attribute preserved by C<HTML::ListScraper>
 is C<href>. For ultimate flexibility in preprocessing the input HTML,
 you can subclass this method, but do call the base version at least
 conditionally. Note that if you want to just ignore some tags, there
-are simpler ways, i.e. L<HTML::Parser::ignore_tags>.
+are simpler ways, i.e. C<HTML::Parser::ignore_tags>.
 
 =head2 on_text
 

@@ -33,7 +33,8 @@ sub first_pos {
 sub log_score {
     my $self = shift;
 
-    return log($self->{spread}) * $self->{length};
+    # return log($self->{spread}) * $self->{length};
+    return log($self->{spread}) * log($self->{length});
 }
 
 sub positions {

@@ -1,27 +1,28 @@
 ---
 len: 6
 count: 3
-- start: 11
-  match: |
-   <tr>
-     <td>
-     </td>
-     <td>
-     </td>
-   </tr>
-- start: 17
-  match: |
-   <tr>
-     <td>
-     </td>
-     <td>
-     </td>
-   </tr>
-- start: 23
-  match: |
-   <tr>
-     <td>
-     </td>
-     <td>
-     </td>
-   </tr>
+seq:
+ - exact: 11
+   inst: |
+    <tr>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+ - exact: 17
+   inst: |
+    <tr>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+ - exact: 23
+   inst: |
+    <tr>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>

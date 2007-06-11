@@ -7,6 +7,7 @@ use Class::Generate qw(class);
 
 class 'HTML::ListScraper::Tag' => {
     name => { type => '$', required => 1, readonly => 1 },
+    index => { type => '$', required => 1, readonly => 1 },
     link => { type => '$', readonly => 1 },
     text => '$',
     '&append_text' => q{ $text .= $_[0]; }
@@ -14,7 +15,7 @@ class 'HTML::ListScraper::Tag' => {
 
 sub new {
     my $class = shift;
-    my $self = { shapeless => 0,
+    my $self = { shapeless => 0, index => 0,
 		 dseq => [ ], next => 0, tseq => [ ], p2t => { } };
 
     # the list is from HTML 4.01 Transitional DTD; head and body is
@@ -49,14 +50,16 @@ sub is_unclosed_tag {
 sub push_item {
     my ($self, $name) = @_;
 
-    $self->_push(HTML::ListScraper::Tag->new(name => $name));
+    my $index = ($self->{index})++;
+    $self->_push(HTML::ListScraper::Tag->new(name => $name, index => $index));
 }
 
 sub push_link {
     my ($self, $name, $link) = @_;
 
+    my $index = ($self->{index})++;
     $self->_push(HTML::ListScraper::Tag->new(
-        name => $name, link => $link));
+        name => $name, index => $index, link => $link));
 }
 
 sub get_internal_name {
@@ -65,10 +68,8 @@ sub get_internal_name {
     return exists($self->{p2t}->{$name}) ? $self->{p2t}->{$name} : undef;
 }
 
-sub _push {
-    my ($self, $td) = @_;
-
-    my $name = $td->name;
+sub intern_name {
+    my ($self, $name) = @_;
 
     if (!exists($self->{p2t}->{$name})) {
         use bytes;
@@ -85,8 +86,16 @@ sub _push {
 	$self->{p2t}->{$name} = bytes::chr($c);
     }
 
+    return $self->{p2t}->{$name};
+}
+
+sub _push {
+    my ($self, $td) = @_;
+
+    my $name = $td->name;
+    my $iname = $self->intern_name($name);
     push @{$self->{dseq}}, $td;
-    push @{$self->{tseq}}, $self->{p2t}->{$name};
+    push @{$self->{tseq}}, $iname;
 }
 
 sub append_text {
@@ -145,7 +154,14 @@ sub is_presentable {
         ++$i;
     }
 
-    return !scalar(@stack);
+    while (scalar(@stack)) {
+        my $top = pop @stack;
+	if (!$self->is_unclosed_tag($top)) {
+	    return 0;
+	}
+    }
+
+    return 1;
 }
 
 sub get_all_tags {
@@ -159,6 +175,12 @@ sub get_tags {
 
     my $last = $start + $len - 1;
     return @{$self->{dseq}}[$start .. $last];
+}
+
+sub get_tag {
+    my ($self, $pos) = @_;
+
+    return $self->{dseq}->[$pos];
 }
 
 1;

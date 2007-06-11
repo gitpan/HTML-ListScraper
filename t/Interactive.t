@@ -2,10 +2,19 @@
 
 use warnings;
 
-use Test::More tests => 2;
+use Test::More tests => 3;
 
 use HTML::ListScraper;
 use HTML::ListScraper::Interactive qw(format_tags canonicalize_tags);
+
+use Class::Generate qw(class);
+
+class 'HTML::ListScraper::TTag' => {
+    name => { type => '$', required => 1, readonly => 1 },
+    index => { type => '$', required => 1, readonly => 1 },
+    link => { type => '$', readonly => 1 },
+    text => '$',
+};
 
 my $scraper = HTML::ListScraper->new( api_version => 3,
 				      marked_sections => 1 );
@@ -33,3 +42,21 @@ my @expected = qw(tr td /td td /td /tr);
 my @plain = canonicalize_tags(@formatted);
 is_deeply(\@plain, \@expected);
 
+$expected = <<EXPECTED
+<p>
+  <p>
+  </p>
+  <p>
+  </p>
+</p>
+EXPECTED
+;
+
+my @tags;
+my $index = 0;
+foreach (qw(p p /p p /p /p)) {
+    push @tags, HTML::ListScraper::TTag->new(name => $_, index => $index++);
+}
+@formatted = format_tags($scraper, \@tags);
+$formatted = join '', @formatted;
+is($formatted, $expected);

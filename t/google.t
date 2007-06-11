@@ -2,49 +2,49 @@
 
 use warnings;
 
-use Test::More tests => 101;
+use Test::More tests => 30;
 
 use HTML::ListScraper;
 
-my $scraper = HTML::ListScraper->new( api_version => 3,
-				      marked_sections => 1 );
-my @ignore_tags = qw(b i em strong);
-$scraper->ignore_tags(@ignore_tags);
-$scraper->parse_file("testdata/google.html");
+sub check;
 
-my @seq = $scraper->get_sequences;
-is(scalar(@seq), 2);
-my $seq = shift @seq;
-isa_ok($seq, 'HTML::ListScraper::Sequence');
-is($seq->len, 46);
+my @known = qw(div a /a table tr td font br span /span nobr a /a a /a /nobr /font /td /tr /table /div);
 
-my @inst = $seq->instances;
-is(scalar(@inst), 4);
-
-my @names = qw(div h2 a /a /h2 table tr td font br span /span nobr a /a a /a
-	       /nobr /font /td /tr /table /div div h2 a /a /h2 table tr td
-	       font br span /span nobr a /a a /a /nobr /font /td /tr /table
-	       /div);
-my $inst = $inst[2];
-my @tags = $inst->tags;
-my $i = 0;
-while ($i < scalar(@names)) {
-    my $tag = $tags[$i];
-    isa_ok($tag, 'HTML::ListScraper::Tag');
-    is($tag->name, $names[$i]);
-
-    ++$i;
+my @testdata = qw(testdata/google.html testdata/google2.html testdata/google3.html);
+foreach (@testdata) {
+    check($_);
 }
 
-$seq = shift @seq;
-isa_ok($seq, 'HTML::ListScraper::Sequence');
-is($seq->len, 92);
+sub check {
+    my $fname = shift;
 
-@inst = $seq->instances;
-is(scalar(@inst), 2);
+    my $scraper = HTML::ListScraper->new( api_version => 3,
+					  marked_sections => 1 );
+    my @ignore_tags = qw(b i em strong);
+    $scraper->ignore_tags(@ignore_tags);
+    $scraper->parse_file($fname);
 
-$seq = $scraper->get_known_sequence(@names[0..11]);
-isa_ok($seq, 'HTML::ListScraper::Sequence');
+    my @seq = $scraper->get_sequences;
+    is(scalar(@seq), 1);
+    my $seq = shift @seq;
+    isa_ok($seq, 'HTML::ListScraper::Sequence');
+    ok($seq->len >= 20);
 
-@inst = $seq->instances;
-is(scalar(@inst), 10);
+    my @inst = $seq->instances;
+    ok(scalar(@inst) <= 10);
+
+    @seq = $scraper->find_sequences;
+    is(scalar(@seq), 1);
+    $seq = shift @seq;
+    isa_ok($seq, 'HTML::ListScraper::Sequence');
+    ok($seq->len >= 20);
+
+    @inst = $seq->instances;
+    ok(scalar(@inst) >= 10);
+
+    $seq = $scraper->find_known_sequence(@known);
+    isa_ok($seq, 'HTML::ListScraper::Sequence');
+
+    @inst = $seq->instances;
+    ok(scalar(@inst) >= 10);
+}

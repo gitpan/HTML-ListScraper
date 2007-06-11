@@ -14,6 +14,7 @@ lib/HTML/ListScraper/Sequence.pod
 lib/HTML/ListScraper/Tag.pod
 lib/HTML/ListScraper/Vat.pm
 t/00-load.t
+t/Book.t
 t/Interactive.t
 t/reddit.t
 t/google.t
@@ -21,6 +22,11 @@ t/scrape.t
 testdata/del.icio.us-overview.yaml
 testdata/del.icio.us.html
 testdata/reddit.html
+testdata/google.exported
 testdata/google.html
+testdata/google-well-known.yaml
+testdata/google2.html
+testdata/google2-well-known.yaml
+testdata/google3.html
 testdata/synth.html
 testdata/synth-default.yaml

@@ -18,6 +18,10 @@ not allowed. Angle brackets are not part of the name - if you need
 them, you can always add them when formatting C<HTML::ListScraper>
 output.
 
+=head2 index
+
+Tag position (zero-based).
+
 =head2 link
 
 Value of the C<href> attribute, if the parsed tag had a C<href>

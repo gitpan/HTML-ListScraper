@@ -11,6 +11,8 @@ WriteMakefile(
     PREREQ_PM => {
 	'HTML::Parser' => 0,
 	'Class::Generate' => 0,
+	'Algorithm::NeedlemanWunsch' => '0.02',
+	'LWP' => 0,
         'IPC::Run3'=> 0,
         'Probe::Perl' => 0
     },

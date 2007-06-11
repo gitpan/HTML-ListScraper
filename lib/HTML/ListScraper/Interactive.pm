@@ -16,6 +16,7 @@ use Class::Generate qw(class);
 
 class 'HTML::ListScraper::FormTag' => {
     name => { type => '$', required => 1 },
+    index => { type => '$', required => 1, readonly => 1 },
     link => { type => '$', required => 1, readonly => 1 },
     text => { type => '$', required => 1, readonly => 1 },
     '&close_name' => q{ $name .= '/'; }
@@ -38,11 +39,11 @@ sub format_tags {
 
     my $incl_attr;
     my $incl_text;
-    my $incl_ln;
+    my $incl_index;
     if (ref($incl)) {
         $incl_attr = $incl->{attr};
         $incl_text = $incl->{text};
-        $incl_ln = $incl->{ln};
+        $incl_index = $incl->{index};
     }
 
     my @buffer;
@@ -53,15 +54,15 @@ sub format_tags {
 	$tag =~ s~^\/~~;
 
 	my $text = $td->text || '';
-	$text =~ s/[\s\r\n]+/ /g;
+	$text =~ s/[\s[:cntrl:]]+/ /g;
 
 	my $link = $td->link || '';
-	$link =~ s/[\s\r\n]+//g;
+	$link =~ s/[\s[:cntrl:]]+//g;
 
 	if ($name eq $tag) {
 	    push @stack, [ $tag, scalar(@buffer) ];
 	    push @buffer, HTML::ListScraper::FormTag->new(name => $name,
-                link => $link, text => $text);
+                index => $td->index, link => $link, text => $text);
 	} else {
 	    while (scalar(@stack) &&
 		    ($stack[scalar(@stack) - 1]->[0] ne $tag)) {
@@ -80,14 +81,14 @@ sub format_tags {
 	    }
 
 	    push @buffer, HTML::ListScraper::FormTag->new(name => $name,
-                link => $link, text => $text);
+                index => $td->index, link => $link, text => $text);
 	}
     }
 
     my @out;
     my $prev;
+    my $prev_index;
     my $depth = 0;
-    my $ln = 0;
     foreach my $ft (@buffer) {
         my $name = $ft->name;
         if (defined($prev)) {
@@ -110,19 +111,23 @@ sub format_tags {
 	}
 
 	my $lncol = '';
-	if ($incl_ln) {
-	    $lncol = "$ln\t";
+	if ($incl_index) {
+	    $lncol = $ft->index . "\t";
+	}
+
+	if (defined($prev_index) && (($ft->index - $prev_index) != 1)) {
+	    push @out, "\n";
 	}
 
 	push @out, "$lncol$indent<$name$attr>\n";
 	
 	if ($incl_text && ($ft->text !~ /^[\s\r\n]*$/)) {
-	    $lncol = $incl_ln ? "\t" : "";
-	    push @out, $lncol . $indent . encode_entities($ft->text) . "\n";
+	    $lncol = $incl_index ? "\t" : "";
+	    push @out, $lncol . $indent . encode_entities($ft->text, "<>&") . "\n";
 	}
 
 	$prev = $name;
-	++$ln;
+	$prev_index = $ft->index;
     }
 
     return wantarray ? @out : \@out;
@@ -173,10 +178,9 @@ Include the C<href> attribute in the output.
 
 Include the plain text in the output.
 
-=item ln
+=item index
 
-Include line numbers in the output. Text lines are not numbered, only
-tags.
+Include tag positions in the output.
 
 =back
 
@@ -186,18 +190,19 @@ brackets. The returned values don't necessarily form a valid XML
 fragment, though, i.e. because the input tags need not form a
 tree.
 
-When C<ln> is set, tag values start with a line number, followed
+When C<index> is set, tag values start with the tag's index, followed
 by a tab. Next, spaces show indentation. An opening tag not identified
 as missing a closing tag increases indentation by 2 spaces, a closing
 tag decreases it back. An opening tag with missing closing tag is
 output with '/' appended to its name. For the rules of associating
-opening and closing tags, see L<HTML::ListScraper::shapeless>.
+opening and closing tags, see C<HTML::ListScraper::shapeless>.
 
 When C<attr> is set, links are formatted without whitespace and
 enclosed in double quotes. Double quotes in links are escaped, but no
 other characters are (which can also make the result invalid
-HTML). When C<text> is set, the output text has normalized whitespace,
-nodes containing only whitespace are dropped. All values end with a
+HTML). When C<text> is set, the output text has normalized whitespace;
+nodes containing only whitespace are dropped. Gaps between adjacent
+tag positions are displayed as an empty line. All values end with a
 newline.
 
 =head2 canonicalize_tags
@@ -205,6 +210,6 @@ newline.
 Undoes the formatting done by C<format_tags>. Takes a list of lines
 such as those output by C<format_tags> when called without any
 formatting options and converts them to a list of tag names. Note that
-C<canonicalize_tags> doesn't handle attributes, text lines nor line
+C<canonicalize_tags> doesn't handle attributes, text lines nor index
 numbers.
 
