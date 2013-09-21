@@ -85,6 +85,11 @@ sub format_tags {
 	}
     }
 
+    while (scalar(@stack)) {
+        my $pair = pop @stack;
+	$buffer[$pair->[1]]->close_name();
+    }
+
     my @out;
     my $prev;
     my $prev_index;

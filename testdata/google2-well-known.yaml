@@ -3,7 +3,7 @@ len: 21
 count: 13
 seq:
  - approx: 31
-   score: 8
+   score: 9
    inst: |
     <table>
       <tr>
@@ -268,7 +268,7 @@ seq:
       </table>
     </div>
  - approx: 442
-   score: 8
+   score: 9
    inst: |
     <table>
       <tr>

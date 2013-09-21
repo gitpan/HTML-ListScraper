@@ -1,16 +1,27 @@
-# http://module-build.sourceforge.net/META-spec.html
-#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
-name:         HTML-ListScraper
-version:      0.05
-version_from: lib/HTML/ListScraper.pm
-installdirs:  site
+---
+abstract: 'generic web page scraping support'
+author:
+  - 'Vaclav Barta <vbar@comp.cz>'
+build_requires:
+  ExtUtils::MakeMaker: 0
+configure_requires:
+  ExtUtils::MakeMaker: 0
+dynamic_config: 1
+generated_by: 'ExtUtils::MakeMaker version 6.62, CPAN::Meta::Converter version 2.112621'
+license: unknown
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: HTML-ListScraper
+no_index:
+  directory:
+    - t
+    - inc
 requires:
-    Algorithm::NeedlemanWunsch:    0.02
-    Class::Generate:               0
-    HTML::Parser:                  0
-    IPC::Run3:                     0
-    LWP:                           0
-    Probe::Perl:                   0
-
-distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.30
+  Algorithm::NeedlemanWunsch: 0.04
+  Class::Generate: 0
+  HTML::Parser: 0
+  IPC::Run3: 0
+  LWP: 0
+  Probe::Perl: 0
+version: 0.06

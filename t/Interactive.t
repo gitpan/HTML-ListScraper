@@ -2,7 +2,7 @@
 
 use warnings;
 
-use Test::More tests => 3;
+use Test::More tests => 4;
 
 use HTML::ListScraper;
 use HTML::ListScraper::Interactive qw(format_tags canonicalize_tags);
@@ -55,6 +55,21 @@ EXPECTED
 my @tags;
 my $index = 0;
 foreach (qw(p p /p p /p /p)) {
+    push @tags, HTML::ListScraper::TTag->new(name => $_, index => $index++);
+}
+@formatted = format_tags($scraper, \@tags);
+$formatted = join '', @formatted;
+is($formatted, $expected);
+
+$expected = <<EXPECTED2
+<hr/>
+<hr/>
+EXPECTED2
+;
+
+@tags = ();
+$index = 0;
+foreach (qw(hr hr)) {
     push @tags, HTML::ListScraper::TTag->new(name => $_, index => $index++);
 }
 @formatted = format_tags($scraper, \@tags);

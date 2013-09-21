@@ -26,7 +26,7 @@ class 'HTML::ListScraper::Instance' => {
 
 @ISA = qw(HTML::Parser);
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 sub new {
     my $class = shift;
@@ -290,12 +290,10 @@ sub _make_sequence {
         instances => \@instances);
 }
 
-sub _ensure_tag_syntax {
+sub _is_tag {
     my ($self, $tag) = @_;
 
-    if ($tag !~ /^[a-z0-9-:]+$/i) {
-        die "invalid tag $tag";
-    }
+    return $tag =~ m/^[a-z0-9-:]+$/i;
 }
 
 sub on_start {
@@ -304,7 +302,10 @@ sub on_start {
     my $tag = $rtag;
     $tag =~ s/\s*\/$//;
 
-    $self-> _ensure_tag_syntax($tag);
+    if (!$self->_is_tag($tag)) {
+        $self->{book}->append_text($tag);
+	return;
+    }
 
     if (exists($attr->{href}) && $attr->{href}) {
 	$self->{book}->push_link($tag, $attr->{href});
@@ -326,7 +327,10 @@ sub on_text {
 sub on_end {
     my ($self, $tag) = @_;
 
-    $self-> _ensure_tag_syntax($tag);
+    if (!$self->_is_tag($tag)) {
+        $self->{book}->append_text($tag);
+	return;
+    }
 
     $self->{book}->push_item("/$tag");
 }
@@ -341,7 +345,7 @@ HTML::ListScraper - generic web page scraping support
 
 =head1 VERSION
 
-Version 0.05
+Version 0.06
 
 =head1 SYNOPSIS
 
@@ -382,15 +386,15 @@ works the same as with C<HTML::Parser>, except you don't need to
 register your own HTML event handlers.
 
 When the document is parsed, call C<find_sequences> to find out which
-tags in the document repeat, one after the other, more than once (text
-and comments are ignored for this comparison). Since there'll probably
-be quite a lot of such sequences, C<HTML::ListScraper> tries to find
-the "longest one repeating most often", specifically, it maximizes
-C<log(number of non-overlapping runs)*log(number of tags in the
-sequence)>. There can obviously be more than one such sequence, which
-is why the method returns an array (and the array can also be empty -
-see below). Your application can then iterate over the returned
-structure to find items of interest.
+tags in the document repeat, one after the other, more than once
+(attributes, text and comments are ignored for this comparison). Since
+there'll probably be quite a lot of such sequences,
+C<HTML::ListScraper> tries to find the "longest one repeating most
+often", specifically, it maximizes C<log(number of non-overlapping
+runs)*log(number of tags in the sequence)>. There can obviously be
+more than one such sequence, which is why the method returns an array
+(and the array can also be empty - see below). Your application can
+then iterate over the returned structure to find items of interest.
 
 This module includes a script, C<scrape>, displaying the sequences
 found by C<HTML::ListScraper>, so that you can see which items your
@@ -535,7 +539,7 @@ Vaclav Barta, C<< <vbar@comp.cz> >>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2007 Vaclav Barta, all rights reserved.
+Copyright 2007-2013 Vaclav Barta, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

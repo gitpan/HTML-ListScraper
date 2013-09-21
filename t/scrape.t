@@ -4,7 +4,7 @@ use warnings;
 
 use vars qw(*F);
 
-use Test::More tests => 5;
+use Test::More tests => 6;
 use Fatal qw(open mkdir rmdir unlink);
 use IPC::Run3 qw/run3/;
 use Probe::Perl;
@@ -17,6 +17,8 @@ check('scrape --core=all testdata/synth.html',
       'testdata/synth-default.yaml');
 check('scrape --core=l testdata/synth.html',
       'testdata/synth-default.yaml');
+check('scrape --core=a --detail=attributes testdata/atlas.html',
+      'testdata/atlas-links.yaml');
 check('scrape --min-count=12 --core=a --detail=none testdata/del.icio.us.html',
       'testdata/del.icio.us-overview.yaml');
 check('scrape --import=testdata/google.exported --core=all --detail=all testdata/google.html', 'testdata/google-well-known.yaml');

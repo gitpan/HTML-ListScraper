@@ -71,13 +71,19 @@ if ($acquire || ($name =~ /^http:\/\//)) {
         die $resp->status_line;
     }
 
+    my $raw = $resp->content;
     if ($acquire) {
         open(EXPORT, ">$acquire");
-	print EXPORT $resp->content;
+	print EXPORT $raw;
 	close(EXPORT);
     }
 
     my $html = $resp->decoded_content;
+    if (!$html) {
+        warn "cannot decode incoming HTML: using raw bytes\n";
+	$html = $raw;
+    }
+
     $scraper->parse($html);
     $scraper->eof;
 } else {
@@ -141,6 +147,7 @@ sub show_core {
     } else {
         open(IMPORT, $import);
 	my @import = <IMPORT>;
+	close(IMPORT);
 	my @tags = canonicalize_tags(@import);
         my $s = $scraper->find_known_sequence(@tags);
 	if ($s) {
