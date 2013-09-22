@@ -24,4 +24,4 @@ requires:
   IPC::Run3: 0
   LWP: 0
   Probe::Perl: 0
-version: 0.06
+version: 0.07

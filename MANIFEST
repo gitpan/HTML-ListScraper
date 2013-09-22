@@ -21,6 +21,8 @@ t/Interactive.t
 t/reddit.t
 t/google.t
 t/scrape.t
+testdata/atlas-links.yaml
+testdata/atlas.html
 testdata/del.icio.us-overview.yaml
 testdata/del.icio.us.html
 testdata/reddit.html
